@@ -71,7 +71,7 @@ def sample_pair(rng: random.Random, k: int, mode="uniform"):
     if mode == "uniform":
         return rng.randint(lo, hi), rng.randint(lo, hi)
 
-    c_out = _make_carry_pattern(k, mode)
+    c_out = _make_carry_pattern(rng, k, mode)
 
     a_digits = []
     b_digits = []
@@ -79,7 +79,8 @@ def sample_pair(rng: random.Random, k: int, mode="uniform"):
 
     for i in range(k):  # loop over columns
         leading_dig = (i == k-1)
-        ai, bi = _choose_digits_given_carry(c_in=c_in, 
+        ai, bi = _choose_digits_given_carry(rng=rng,
+                                            c_in=c_in, 
                                             c_out=c_out[i], 
                                             leading_dig=leading_dig)
             

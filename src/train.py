@@ -1,3 +1,7 @@
+# -------------
+# Train Model
+# -------------
+
 from model import build_model
 from tokenizer import CharacterTokenizer
 

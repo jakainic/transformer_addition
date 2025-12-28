@@ -1,8 +1,8 @@
 from typing import List
 
-# -----------------------
+# --------------------------
 # Character-level tokenizer
-# -----------------------
+# --------------------------
 class CharacterTokenizer:
     def __init__(self):
         self.vocab = ["<pad>", "<bos>", "<eos>"] + list("0123456789 +=")

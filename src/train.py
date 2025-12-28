@@ -42,8 +42,13 @@ def main():
     train_ds = AdditionDataset(args.train_path, tok, max_len=args.max_len)
     val_ds   = AdditionDataset(args.val_path, tok, max_len=args.max_len)
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = build_model(len(tok.vocab)).to(device) # TODOARGS
+    model = build_model(
+    vocab_size=len(tok.vocab),
+    n_ctx=args.max_len,
+    n_layer=args.n_layer,
+    n_embd=args.n_embd,
+    n_head=args.n_head,
+    )
 
     targs = TrainingArguments(
         output_dir=args.out_dir,

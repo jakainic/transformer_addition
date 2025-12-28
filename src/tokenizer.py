@@ -26,5 +26,3 @@ class CharacterTokenizer:
             if i in (self.pad_id, self.bos_id): continue
             out.append(self.itos[i])
         return "".join(out)
-
-tok = CharacterTokenizer()

@@ -8,6 +8,7 @@ from src.tokenizer import CharacterTokenizer
 from src.utils import seed_everything
 
 import argparse
+import json
 from pathlib import Path
 from transformers import Trainer, TrainingArguments
 

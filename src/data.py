@@ -1,10 +1,12 @@
-# -----------------------
-# Synthetic datasets
-# -----------------------
+# ------------------------------------------
+# Synthetic datasets: generation + loading
+# ------------------------------------------
 
 import argparse, json
 from pathlib import Path
 from typing import Tuple
+import torch
+from torch.utils.data import Dataset
 
 from src.utils import seed_everything, make_rng
 
@@ -107,6 +109,43 @@ def write_dataset(path: Path, n: int, k: int, mode: str, seed: int):
                 "answer": answer
             }
             f.write(json.dumps(row) + "\n")
+
+class AdditionDataset(Dataset):
+    def __init__(self, path: str, tok, max_len: int = 64):
+        self.path = Path(path)
+        self.tok = tok
+        self.max_len = max_len
+        self.rows = self.path.read_text().splitlines()
+
+    def __len__(self):
+        return len(self.rows)
+
+    def __getitem__(self, idx):
+        ex = json.loads(self.rows[idx])
+        prompt = ex["prompt"]
+        ans = ex["answer"]
+
+        full = prompt + " " + ans
+        input_ids = self.tok.encode(full, add_bos=True, add_eos=True)
+
+        prompt_ids = self.tok.encode(prompt, add_bos=True, add_eos=False)
+        labels = [-100] * len(prompt_ids) + input_ids[len(prompt_ids):]
+
+        input_ids = input_ids[: self.max_len]
+        labels = labels[: self.max_len]
+
+        attn = [1] * len(input_ids)
+        pad_len = self.max_len - len(input_ids)
+        if pad_len > 0:
+            input_ids += [self.tok.pad_id] * pad_len
+            labels += [-100] * pad_len
+            attn += [0] * pad_len
+
+        return {
+            "input_ids": torch.tensor(input_ids, dtype=torch.long),
+            "attention_mask": torch.tensor(attn, dtype=torch.long),
+            "labels": torch.tensor(labels, dtype=torch.long),
+        }
 
 def main():
     p = argparse.ArgumentParser()

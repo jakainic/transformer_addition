@@ -70,14 +70,26 @@ def digit_accuracy(pred: str, gold: str) -> float:
     correct = sum(p == g for p, g in zip(pred_aligned, gold_aligned))
     return correct / L
 
-def evaluate_examples(model, tok, examples, device="cuda", batch_size=256):
+def evaluate_examples(model, 
+                      tok, 
+                      examples, 
+                      device="cuda", 
+                      batch_size=256, 
+                      collect_errors=True, 
+                      max_errors=50,
+                     ):
     # examples: list[(a,b,k,gold)]
     em = 0
     da = 0.0
     n = len(examples)
 
+    if n == 0:
+        return {"exact_match": 0.0, "digit_acc": 0.0, "n": 0, "k": None}, []
+
     k = examples[0][2]
     max_new_tokens = k + 4
+
+    errors = [] # list of dicts
 
     i = 0
     while i < n:
@@ -85,12 +97,31 @@ def evaluate_examples(model, tok, examples, device="cuda", batch_size=256):
         pairs = [(a,b) for (a,b,_,_) in chunk]
         golds = [gold for (_,_,_,gold) in chunk]
         preds = predict_sum_batched(model, tok, pairs, k=k, max_new_tokens=max_new_tokens, device=device)
-        for pred, gold in zip(preds, golds):
-            em += int(pred == gold)
+        for pair, pred, gold in zip(pairs, preds, golds):
+            is_correct = (pred == gold)
+            em += is_correct
             da += digit_accuracy(pred, gold)
-        i += batch_size
 
-    return {"exact_match": em / n, "digit_acc": da / n, "n": n, "k": k} 
+            if collect_errors and (not is_correct) and (len(errors) < max_errors):
+                errors.append({
+                    "a": pair[0],
+                    "b": pair[1],
+                    "k": k,
+                    "gold": gold,
+                    "pred": pred,
+                })
+        i += batch_size
+    
+    results = {"exact_match": em / n, "digit_acc": da / n, "n": n, "k": k}
+    return results, errors
+
+def maybe_write_errors(errors, path: Path):
+    if len(errors) == 0:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(errors, f, indent=2)
+    print(f"Wrote {len(errors)} errors to {path}")
 
 def main():
     p = argparse.ArgumentParser()
@@ -101,6 +132,8 @@ def main():
     p.add_argument("--out", type=str, default="results/results.json")
     p.add_argument("--batch_size", type=int, default=256)
     p.add_argument("--seed", type=int, default=123)
+    p.add_argument("--errors_dir", type=str, default="results/errors")
+    p.add_argument("--max_errors", type=int, default=50)
     args = p.parse_args()
 
     seed_everything(args.seed)
@@ -113,10 +146,14 @@ def main():
     lng = load_jsonl_examples(args.len_path)
     car = load_jsonl_examples(args.carry_path)
 
+    results_iid, errors_iid = evaluate_examples(model, tok, iid, device=device, batch_size=args.batch_size, max_errors=args.max_errors)
+    results_length, errors_length = evaluate_examples(model, tok, lng, device=device, batch_size=args.batch_size, max_errors=args.max_errors)
+    results_carry, errors_carry = evaluate_examples(model, tok, car, device=device, batch_size=args.batch_size, max_errors=args.max_errors)
+
     results = {
-        "iid_uniform_k": evaluate_examples(model, tok, iid, device=device, batch_size=args.batch_size),
-        "length_uniform_kplus1": evaluate_examples(model, tok, lng, device=device, batch_size=args.batch_size),
-        "shift_maxcarry_k": evaluate_examples(model, tok, car, device=device, batch_size=args.batch_size),
+        "iid_uniform_k": results_iid,
+        "length_uniform_kplus1": results_length,
+        "shift_maxcarry_k": results_carry,
     }
 
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
@@ -125,6 +162,11 @@ def main():
     print("Wrote", args.out)
     for name, r in results.items():
         print(name, r)
+
+    errors_dir = Path(args.errors_dir)
+    maybe_write_errors(errors_iid, errors_dir / "errors_iid.json")
+    maybe_write_errors(errors_length, errors_dir / "errors_length.json")
+    maybe_write_errors(errors_carry, errors_dir / "errors_maxcarry.json")
 
 if __name__ == "__main__":
     main()

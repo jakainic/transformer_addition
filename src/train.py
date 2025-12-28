@@ -69,5 +69,10 @@ def main():
     trainer.train()
     trainer.save_model(args.out_dir)
 
+    log_path = Path(args.out_dir) / "log_history.json"
+    with open(log_path, "w") as f:
+        json.dump(trainer.state.log_history, f, indent=2)
+    print("Saved logs to", log_path)
+
 if __name__ == "__main__":
     main()

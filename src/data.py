@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import Dataset
 
 # -----------------------
-# 2) Synthetic datasets
+# Synthetic datasets
 # -----------------------
 def _choose_digits_given_carry(c_in: int, c_out: int, leading_dig: bool = False):
     """

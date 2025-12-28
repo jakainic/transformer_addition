@@ -9,7 +9,7 @@ from src.tokenizer import CharacterTokenizer
 from src.utils import seed_everything, make_rng
 
 @torch.no_grad()
-def predict_sum_batched(model, pairs, k, max_new_tokens, device="cuda"):
+def predict_sum_batched(model, tok, pairs, k, max_new_tokens, device="cuda"):
     model.eval()
 
     # Build prompts and encode
@@ -23,7 +23,7 @@ def predict_sum_batched(model, pairs, k, max_new_tokens, device="cuda"):
     input_ids = torch.full((B, max_prompt_len), tok.pad_id, dtype=torch.long, device=device)
     attn = torch.zeros((B, max_prompt_len), dtype=torch.long, device=device)
 
-    prompt_lens = [
+    prompt_lens = []
     for i, ids in enumerate(prompt_ids_list):
       L = len(ids)
       prompt_lens.append(L)

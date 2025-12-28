@@ -1,11 +1,12 @@
+# -----------------------
+# Synthetic datasets
+# -----------------------
+
 import random
 
 import torch
 from torch.utils.data import Dataset
 
-# -----------------------
-# Synthetic datasets
-# -----------------------
 def _choose_digits_given_carry(c_in: int, c_out: int, leading_dig: bool = False):
     """
     Sample (a_digit, b_digit) in [0..9]^2 such that:

@@ -4,13 +4,14 @@
 
 import argparse, json
 from pathlib import Path
+import random
 from typing import Tuple
 import torch
 from torch.utils.data import Dataset
 
 from src.utils import seed_everything, make_rng
 
-def _choose_digits_given_carry(c_in: int, c_out: int, leading_dig: bool = False):
+def _choose_digits_given_carry(rng: random.Random, c_in: int, c_out: int, leading_dig: bool = False):
     """
     Sample (a_digit, b_digit) in [0..9]^2 such that:
       (a_digit + b_digit + c_in >= 10)  <=>  c_out == 1
@@ -25,10 +26,10 @@ def _choose_digits_given_carry(c_in: int, c_out: int, leading_dig: bool = False)
         # need a+b+c_in >= 10 -> a+b >= 10 - c_in
         s_min, s_max = 10 - c_in, 18 - c_in
 
-    s = random.randint(s_min, s_max)  # desired a+b
+    s = rng.randint(s_min, s_max)  # desired a+b
     a_min = max(0, s - 9) if not leading_dig else max(1, s-9)
     a_max = min(9, s) if not leading_dig else min(9, s-1)
-    a = random.randint(a_min, a_max)
+    a = rng.randint(a_min, a_max)
     b = s - a
     return a, b
 
@@ -38,7 +39,7 @@ def _digits_to_int(digits_lsd_first):
         n += d * (10 ** i)
     return n
 
-def _make_carry_pattern(k: int, mode: str):
+def _make_carry_pattern(rng: random.Random, k: int, mode: str):
     """
     Returns a list c_out of length k with entries in {0,1}.
     c_out[i] is carry-out from column i (i=0 is ones place).
@@ -50,12 +51,12 @@ def _make_carry_pattern(k: int, mode: str):
     if mode == "mid_carry":
         m = k // 2
         pattern = [0] * k
-        for i in random.sample(range(k), m):
+        for i in rng.sample(range(k), m):
             pattern[i] = 1
         return pattern
     raise ValueError(f"Unknown carry mode: {mode}")
 
-def sample_pair(k: int, mode="uniform"):
+def sample_pair(rng: random.Random, k: int, mode="uniform"):
     """
     Sample two k-digit integers (a,b).
 
@@ -68,7 +69,7 @@ def sample_pair(k: int, mode="uniform"):
     lo, hi = 10**(k-1), 10**k - 1
 
     if mode == "uniform":
-        return random.randint(lo, hi), random.randint(lo, hi)
+        return rng.randint(lo, hi), rng.randint(lo, hi)
 
     c_out = _make_carry_pattern(k, mode)
 

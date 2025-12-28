@@ -10,10 +10,6 @@ from src.utils import seed_everything
 import argparse
 from transformers import Trainer, TrainingArguments
 
-# -----------------------
-# Train
-# -----------------------
-
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--train_path", type=str, required=True)

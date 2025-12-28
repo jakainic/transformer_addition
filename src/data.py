@@ -2,10 +2,11 @@
 # Synthetic datasets
 # -----------------------
 
-import random
+import argparse, json
+from pathlib import Path
+from typing import Tuple
 
-import torch
-from torch.utils.data import Dataset
+from src.utils import seed_everything, make_rng
 
 def _choose_digits_given_carry(c_in: int, c_out: int, leading_dig: bool = False):
     """
@@ -93,41 +94,45 @@ def format_example(a: int, b: int, k: int):
     ans = str(a + b)
     return prompt, ans
 
-class AddDataset(Dataset):
-    def __init__(self, n: int, k: int, mode="uniform", max_len=64):
-        self.n = n
-        self.k = k
-        self.mode = mode
-        self.max_len = max_len
+def write_dataset(path: Path, n: int, k: int, mode: str, seed: int):
+    rng = make_rng(seed)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w") as f:
+        for _ in range(n):
+            a, b = sample_pair(rng, k=k, mode=mode)
+            prompt, answer = format_example(a, b, k)
+            row = {
+                "a": a, "b": b, "k": k, "mode": mode,
+                "prompt": prompt,
+                "answer": answer
+            }
+            f.write(json.dumps(row) + "\n")
 
-    def __len__(self): return self.n
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("--out_dir", type=str, default="data")
+    p.add_argument("--k_train", type=int, default=3)
+    p.add_argument("--n_train", type=int, default=200_000)
+    p.add_argument("--n_val", type=int, default=10_000)
+    p.add_argument("--n_test", type=int, default=5_000)
+    p.add_argument("--seed", type=int, default=42)
+    args = p.parse_args()
 
-    def __getitem__(self, idx):
-        a, b = sample_pair(self.k, self.mode)
-        prompt, ans = format_example(a, b, self.k)
+    seed_everything(args.seed)
 
-        # add a leading space before answer (optional but common)
-        full = prompt + " " + ans
-        input_ids = tok.encode(full, add_bos=True, add_eos=True)
+    out = Path(args.out_dir)
+    k = args.k_train
 
-        # labels: ignore prompt; supervise answer+eos
-        prompt_ids = tok.encode(prompt, add_bos=True, add_eos=False)
-        labels = [-100] * len(prompt_ids)
-        labels += input_ids[len(prompt_ids):]
+    # training/val
+    write_dataset(out / f"k{k}_uniform_train.jsonl", args.n_train, k, "uniform", seed=args.seed + 0)
+    write_dataset(out / f"k{k}_uniform_val.jsonl",   args.n_val,   k, "uniform", seed=args.seed + 1)
 
-        # pad to max_len
-        input_ids = input_ids[:self.max_len]
-        labels = labels[:self.max_len]
+    # eval slices
+    write_dataset(out / f"k{k}_uniform_test.jsonl",  args.n_test,  k,   "uniform",   seed=args.seed + 2)
+    write_dataset(out / f"k{k+1}_uniform_test.jsonl",args.n_test,  k+1, "uniform",   seed=args.seed + 3)
+    write_dataset(out / f"k{k}_maxcarry_test.jsonl", args.n_test,  k,   "max_carry", seed=args.seed + 4)
 
-        attn = [1]*len(input_ids)
-        pad_len = self.max_len - len(input_ids)
-        if pad_len > 0:
-            input_ids += [tok.pad_id]*pad_len
-            labels += [-100]*pad_len
-            attn += [0]*pad_len
+    print("Wrote datasets to", out)
 
-        return {
-            "input_ids": torch.tensor(input_ids, dtype=torch.long),
-            "attention_mask": torch.tensor(attn, dtype=torch.long),
-            "labels": torch.tensor(labels, dtype=torch.long),
-        }
+if __name__ == "__main__":
+    main()
